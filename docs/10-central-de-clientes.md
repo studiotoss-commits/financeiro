@@ -56,8 +56,9 @@ Backups nesta etapa são locais e sob demanda. Rotina automática, cópia extern
 ## Estado da entrega em 30/08/2026
 
 - Implementação concluída e validada localmente: 14 testes aprovados, incluindo restauração, migração e rollback sobre cópia real; builds do Financeiro e Manutenção aprovados.
-- Backup atualizado em `.local-backups/2026-08-30-central-clientes/before-deploy.json`: 6 clientes, 38 lançamentos, 8 fornecedores e 2 workspaces. Não versionar nem publicar esses arquivos.
-- Build real preparado no Vercel: `dpl_6vKLVi3yDwcNkvf5qWeusnhuxqwC`. Não promover antes de concluir a migração.
-- **Migração de produção pendente.** A primeira execução no editor web falhou por conteúdo anterior misturado ao SQL; a tentativa seguinte foi bloqueada por segurança porque a leitura do editor não permitiu confirmar o texto integral. Não contornar o bloqueio executando SQL não verificado.
-- Consulta posterior confirmou `base_clients` ausente, 6 clientes e 38 lançamentos no modelo anterior. O endereço principal `financeiro-nine-sigma.vercel.app` permanece na publicação `financeiro-adxk7be3h-studiotoss-3262s-projects.vercel.app`.
-- Para retomar: atualizar o backup, obter um meio autorizado de executar e verificar o arquivo completo, aplicar a migração transacional, promover a interface e comparar os dados com o backup. Não liberar a nova interface antes do banco.
+- Backup final anterior à migração: `.local-backups/2026-08-30-central-clientes/before-resume.json`, capturado em 30/08/2026 às 22:04:04 UTC. Cópia posterior: `after.json`, na mesma pasta. Não versionar nem publicar esses arquivos.
+- **Produção concluída.** Após autorização para retomar, foi aberta uma consulta vazia e conferido o conteúdo do editor por trechos: todos os 17.249 caracteres corresponderam ao arquivo validado. A transação foi aplicada às 22:05:44 UTC, conforme `base_schema_migrations`.
+- Build promovido no Vercel: `dpl_6vKLVi3yDwcNkvf5qWeusnhuxqwC`, publicação `financeiro-orl1w25rk-studiotoss-3262s-projects.vercel.app`. O endereço principal é `https://financeiro-nine-sigma.vercel.app`, com asset `index-DRY3StTg.js` confirmado na página publicada.
+- Comparação pós-migração preservou integralmente os registros de lançamentos, fornecedores, configurações, empresas e membros; os payloads dos clientes reconstruídos correspondem aos anteriores. Permanecem 6 clientes, 38 lançamentos, 8 fornecedores e 2 workspaces.
+- Interface em produção conferida: dashboard carrega sem erro e a Central mostra os 4 clientes do workspace autenticado. Os 2 clientes do outro workspace permanecem separados. Nenhum cadastro de teste foi criado em produção.
+- Para novas cópias lógicas, usar `supabase/ops/backup-after-central.sql`, que inclui as tabelas e funções da central. A publicação anterior para eventual recuperação é `financeiro-adxk7be3h-studiotoss-3262s-projects.vercel.app`; seguir o procedimento de rollback do banco antes de voltar ao frontend antigo.
