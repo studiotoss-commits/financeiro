@@ -1,0 +1,39 @@
+:root {
+  --base-font-family: "Google Sans", "Google Sans Text", "Roboto", Arial, sans-serif;
+  --base-text-xs: 11px;
+  --base-text-sm: 12px;
+  --base-text-md: 13px;
+  --base-text-base: 14px;
+  --base-text-lg: 16px;
+  --base-title-page: 30px;
+  --base-control-height: 44px;
+}
+
+.base-app-switcher { position: relative; margin-bottom: 28px; font-family: var(--base-font-family); }
+.base-app-switcher__trigger { width: 100%; display: flex; align-items: center; gap: 12px; padding: 0 8px; border: 0; color: #16131f; background: transparent; text-align: left; cursor: pointer; }
+.base-app-switcher__mark { width: 42px; height: 42px; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; flex: 0 0 auto; padding: 10px; border-radius: 13px; background: linear-gradient(150deg,#7553ff,#5a39e6 58%,#4824c4); box-shadow: 0 8px 20px rgba(90,57,230,.30); }
+.base-app-switcher__mark i { display: block; border: 1.8px solid #fff; border-radius: 2px; }
+.base-app-switcher__identity { min-width: 0; flex: 1; }
+.base-app-switcher__identity strong { display: block; margin: 0; color: inherit; font-size: 18px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+.base-app-switcher__identity p { overflow: hidden; margin: 4px 0 0; color: #a4a8b6; font-size: 10px; font-weight: 700; letter-spacing: .14em; line-height: 1.2; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.base-app-switcher__chevron { color: #969aaa; font-size: 18px; transition: transform .16s ease; }
+.base-app-switcher__trigger[aria-expanded="true"] .base-app-switcher__chevron { transform: rotate(180deg); }
+.base-app-switcher__menu { position: absolute; z-index: 80; top: calc(100% + 10px); left: 4px; width: 280px; overflow: hidden; padding: 7px; border: 1px solid #e5e3ec; border-radius: 16px; color: #16131f; background: #fff; box-shadow: 0 24px 60px rgba(20,18,31,.2); }
+.base-app-switcher__menu-head { padding: 9px 10px 11px; border-bottom: 1px solid #efedf3; }
+.base-app-switcher__menu-head strong { display: block; font-size: 13px; font-weight: 800; }
+.base-app-switcher__menu-head span { display: block; margin-top: 3px; color: #777b8b; font-size: 11px; }
+.base-app-switcher__option { display: flex; align-items: center; gap: 10px; margin-top: 5px; padding: 10px; border-radius: 11px; color: #343748; text-decoration: none; transition: background .15s ease; }
+.base-app-switcher__option:hover { background: #f5f3fb; }
+.base-app-switcher__option.is-current { background: #f1edff; }
+.base-app-switcher__option-mark { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 10px; color: #fff; font-size: 11px; font-weight: 800; }
+.base-app-switcher__option > span:nth-child(2) { min-width: 0; flex: 1; }
+.base-app-switcher__option strong { display: block; font-size: 12px; font-weight: 800; }
+.base-app-switcher__option small { display: block; overflow: hidden; margin-top: 2px; color: #858999; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.base-app-switcher__current { padding: 4px 6px; border-radius: 999px; color: #5a39e6; background: #e8e2ff; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.base-app-switcher[data-theme="dark"] .base-app-switcher__trigger { color: #fff; }
+.base-app-switcher[data-theme="dark"] .base-app-switcher__identity p { color: #aaa4c2; }
+.base-app-switcher[data-theme="dark"] .base-app-switcher__chevron { color: #aaa4c2; }
+
+@media (max-width: 900px) {
+  .base-app-switcher__menu { position: fixed; top: 72px; left: 14px; width: min(280px, calc(100vw - 28px)); }
+}
