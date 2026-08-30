@@ -9,6 +9,7 @@
     "preview": "vite preview --configLoader runner"
   },
   "dependencies": {
+    "@base/autenticacao": "workspace:*",
     "@base/design-system": "workspace:*",
     "@supabase/supabase-js": "^2.57.4",
     "react": "^18.3.1",

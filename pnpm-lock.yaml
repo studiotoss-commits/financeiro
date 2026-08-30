@@ -14,6 +14,9 @@ importers:
 
   apps/financeiro:
     dependencies:
+      '@base/autenticacao':
+        specifier: workspace:*
+        version: link:../../packages/autenticacao
       '@base/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
@@ -55,6 +58,40 @@ importers:
       vite:
         specifier: ^6.1.0
         version: 6.4.3
+
+  apps/notificacoes-vencimentos:
+    dependencies:
+      '@base/autenticacao':
+        specifier: workspace:*
+        version: link:../../packages/autenticacao
+      '@base/design-system':
+        specifier: workspace:*
+        version: link:../../packages/design-system
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: ^4.4.1
+        version: 4.7.0(vite@6.4.3)
+      vite:
+        specifier: ^6.1.0
+        version: 6.4.3
+
+  packages/autenticacao:
+    dependencies:
+      '@base/design-system':
+        specifier: workspace:*
+        version: link:../design-system
+      '@supabase/supabase-js':
+        specifier: ^2.57.4
+        version: 2.112.2
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
 
   packages/design-system:
     dependencies:

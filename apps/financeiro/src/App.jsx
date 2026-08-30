@@ -42,6 +42,7 @@ const ROUTES = {
 const ROUTE_VIEWS = new Set(Object.keys(ROUTES));
 const SHOW_DASHBOARD_HERO = false;
 const BASE_APPS = [
+  { id: 'not', name: 'NOT', shortName: 'NOT', description: 'Serviços, vencimentos e lembretes', href: import.meta.env.DEV ? 'http://127.0.0.1:5176/not/' : '/not/', color: '#5a39e6' },
   { id: 'financeiro', name: 'Financeiro', shortName: 'FI', description: 'Gestão financeira e comercial', href: '/', color: '#5a39e6' },
   { id: 'manutencao-sites', name: 'Manutenção de sites', shortName: 'MS', description: 'Sites, contratos e manutenções', href: import.meta.env.VITE_MANUTENCAO_SITES_URL || 'http://127.0.0.1:5173/', color: '#d2694d' },
 ];

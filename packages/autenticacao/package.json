@@ -1,0 +1,1 @@
+{"name":"@base/autenticacao","private":true,"version":"0.1.0","type":"module","exports":{".":"./src/AuthGate.jsx","./supabase":"./src/supabase.js","./styles.css":"./src/styles.css"},"dependencies":{"@base/design-system":"workspace:*","@supabase/supabase-js":"^2.57.4"},"peerDependencies":{"react":"^18.3.1"}}

@@ -1,0 +1,19 @@
+.fx-auth { min-height:100%; display:grid; place-items:center; padding:24px; background:radial-gradient(circle at 20% 10%,#eee9ff,transparent 34%),#f5f5f9; color:#242234; font-family:'Google Sans','Google Sans Text','Roboto',Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+.fx-auth *, .fx-auth *::before, .fx-auth *::after { box-sizing:border-box; }
+.fx-auth button, .fx-auth input { font-family:inherit; }
+.fx-auth-card { width:min(420px,100%); display:flex; flex-direction:column; align-items:center; padding:38px; border:1px solid #e7e4ee; border-radius:26px; background:#fff; box-shadow:0 22px 60px rgba(39,31,70,.12); text-align:center; }
+.fx-auth-mark { width:58px; height:58px; display:grid; place-items:center; border-radius:18px; color:#fff; background:linear-gradient(145deg,#7553ff,#5a39e6); box-shadow:0 12px 28px rgba(90,57,230,.28); font-weight:800; }
+.fx-auth-eyebrow { margin:18px 0 4px!important; color:#5a39e6!important; font-size:11px!important; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+.fx-auth-card h1 { margin:6px 0 8px; font-size:26px; letter-spacing:-.04em; }
+.fx-auth-card > p { margin:0; color:#73768a; font-size:14px; line-height:1.55; }
+.fx-auth-card > small { margin-top:18px; color:#9295a6; }
+.fx-auth-form { width:100%; display:grid; gap:14px; margin-top:24px; text-align:left; }
+.fx-auth-form label { display:grid; gap:7px; color:#6d7083; font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+.fx-auth-form .fx-modal-save { width:100%; margin-top:4px; background:#5a39e6; color:#fff; }
+.fx-auth-form .fx-modal-save:hover { background:#4f30d4; filter:none; }
+.fx-auth-form .fx-modal-save:disabled { background:#8e7ae8; color:#fff; opacity:.72; cursor:not-allowed; }
+.fx-auth-link { border:0; background:transparent; color:#5a39e6; cursor:pointer; font-size:12px; font-weight:700; text-align:center; }
+.fx-auth-link:hover { text-decoration:underline; }
+.fx-auth-error { display:flex; align-items:center; gap:8px; padding:11px 12px; border-radius:11px; background:#fff0f4; color:#c52754; font-size:12px; font-weight:600; }
+.fx-password-success { display:flex; align-items:center; gap:8px; padding:11px 12px; border-radius:11px; background:#eefbf3; color:#198754; font-size:12px; font-weight:600; }
+.fx-auth-spinner { width:34px; height:34px; margin-bottom:16px; border:3px solid #e6e0ff; border-top-color:#5a39e6; border-radius:50%; animation:fxSpin .8s linear infinite; }

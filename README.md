@@ -5,13 +5,13 @@ Monorepositório modular dos produtos internos da TOSS.
 ## Estrutura
 
 - `apps/financeiro`: aplicação Financeiro existente (React, Vite e JavaScript).
-- `apps/manutencao-sites`: espaço reservado para o futuro módulo de manutenção de sites.
-- `apps/notificacoes-vencimentos`: espaço reservado para o futuro módulo de notificações de vencimentos.
+- `apps/manutencao-sites`: protótipo do módulo de manutenção de sites.
+- `apps/notificacoes-vencimentos`: NOT, controle de serviços e vencimentos integrado à central.
 - `packages/design-system`: identidade visual e seletor de aplicativos usados pelos módulos ativos.
 - Demais diretórios de `packages`: capacidades compartilhadas somente quando houver reutilização real entre módulos.
 - `docs`: documentação funcional, técnica e operacional.
 
-O Financeiro continua autocontido. Regras de negócio permanecem dentro do módulo, e nenhuma capacidade foi extraída prematuramente para `packages`.
+Regras de negócio permanecem dentro de cada módulo. Financeiro e NOT compartilham autenticação, ícones e seletor de apps; seus dados operacionais têm permissões separadas.
 
 O seletor na marca BASE permite alternar entre os módulos. Em produção, configure `VITE_FINANCEIRO_URL` e `VITE_MANUTENCAO_SITES_URL` conforme os arquivos `.env.example` de cada aplicação.
 
@@ -34,6 +34,7 @@ Na raiz do repositório:
 pnpm install
 pnpm dev
 pnpm build
+pnpm dev:not
 pnpm preview
 ```
 
@@ -46,5 +47,7 @@ pnpm --filter @base/financeiro dev
 ## Critérios para compartilhamento
 
 A central de clientes e a migração segura estão descritas em [Central de clientes](docs/10-central-de-clientes.md). O cadastro é único por workspace; cada app mantém seus dados específicos. O Financeiro usa a central em Clientes / Todos os clientes, sem recadastro.
+
+O [NOT](docs/11-not-vencimentos.md) é publicado em `/not/` na mesma origem do Financeiro para reutilizar a sessão. `pnpm build` compila os dois apps e reúne os artefatos em `apps/financeiro/dist`. Envios externos continuam desativados.
 
 Um código só deve ser promovido a `packages` quando houver pelo menos dois consumidores reais, uma API pública clara e testes que protejam o contrato. Identidade visual, autenticação, navegação e infraestrutura podem ser compartilhadas; regras específicas continuam no módulo de origem.

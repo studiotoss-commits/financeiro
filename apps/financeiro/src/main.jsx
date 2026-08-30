@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import '@base/design-system/styles.css';
+import '@base/autenticacao/styles.css';
 import './styles/system.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
