@@ -1,4 +1,6 @@
 import { supabase } from './supabase';
+import { mergeClient } from './clientModel';
+import { createFinancePersistence } from './financePersistence';
 
 const DEFAULT_CATEGORIES = {
   income: ['Serviços', 'Projetos', 'Recebimentos', 'Outros'],
@@ -18,22 +20,21 @@ export async function loadFinanceState(user) {
   throwIfError(workspaceResult);
   const workspaceId = workspaceResult.data;
 
-  const [transactionsResult, clientsResult, suppliersResult, settingsResult] = await Promise.all([
-    supabase.from('finance_transactions').select('payload').eq('workspace_id', workspaceId).order('created_at', { ascending: false }),
-    supabase.from('finance_clients').select('payload').eq('workspace_id', workspaceId).order('created_at', { ascending: false }),
-    supabase.from('finance_suppliers').select('payload').eq('workspace_id', workspaceId).order('created_at', { ascending: false }),
-    supabase.from('finance_settings').select('payload, revision').eq('workspace_id', workspaceId).maybeSingle(),
-  ]);
-
-  [transactionsResult, clientsResult, suppliersResult, settingsResult].forEach(throwIfError);
-  const settings = settingsResult.data?.payload || {};
-  currentRevision = Number(settingsResult.data?.revision) || 0;
+  const result = await supabase.rpc('load_finance_snapshot', { p_workspace_id: workspaceId });
+  throwIfError(result);
+  if (!result.data) throw new Error('Workspace access denied');
+  const snapshot = result.data;
+  const settings = snapshot.settings?.payload || {};
+  const profiles = new Map(snapshot.profiles.map(p => [p.id, p]));
+  const clients = snapshot.clients.map(row => mergeClient(row, profiles.get(row.id)));
+  const persistence = createFinancePersistence(supabase, workspaceId, Number(snapshot.settings?.revision) || 0, clients);
 
   return {
     workspaceId,
-    entries: transactionsResult.data.map((row) => row.payload),
-    clients: clientsResult.data.map((row) => row.payload),
-    suppliers: suppliersResult.data.map((row) => row.payload),
+    entries: snapshot.entries,
+    clients,
+    suppliers: snapshot.suppliers,
+    save: persistence.save,
     categories: { ...DEFAULT_CATEGORIES, ...(settings.categories || {}) },
     taxRate: Number(settings.taxRate) || 0,
     account: settings.account || {
@@ -43,36 +44,4 @@ export async function loadFinanceState(user) {
       taxRate: 0,
     },
   };
-}
-
-let saveQueue = Promise.resolve();
-let currentRevision = 0;
-
-export function queueFinanceState(state) {
-  saveQueue = saveQueue.catch(() => undefined).then(async () => {
-    const persist = () => supabase.rpc('save_finance_state', {
-        p_workspace_id: state.workspaceId,
-        p_expected_revision: currentRevision,
-        p_state: {
-          entries: state.entries,
-          clients: state.clients,
-          suppliers: state.suppliers,
-          settings: {
-            categories: state.categories,
-            taxRate: state.taxRate,
-            account: state.account,
-          },
-        },
-    });
-    let result = await persist();
-    if (result.error?.message?.includes('Finance state changed in another session')) {
-      const revisionResult = await supabase.from('finance_settings').select('revision').eq('workspace_id', state.workspaceId).maybeSingle();
-      throwIfError(revisionResult);
-      currentRevision = Number(revisionResult.data?.revision) || 0;
-      result = await persist();
-    }
-    throwIfError(result);
-    currentRevision = Number(result.data);
-  });
-  return saveQueue;
 }

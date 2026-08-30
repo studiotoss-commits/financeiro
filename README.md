@@ -45,4 +45,6 @@ pnpm --filter @base/financeiro dev
 
 ## Critérios para compartilhamento
 
+A central de clientes e a migração segura estão descritas em [Central de clientes](docs/10-central-de-clientes.md). O cadastro é único por workspace; cada app mantém seus dados específicos. O Financeiro usa a central em Clientes / Todos os clientes, sem recadastro.
+
 Um código só deve ser promovido a `packages` quando houver pelo menos dois consumidores reais, uma API pública clara e testes que protejam o contrato. Identidade visual, autenticação, navegação e infraestrutura podem ser compartilhadas; regras específicas continuam no módulo de origem.

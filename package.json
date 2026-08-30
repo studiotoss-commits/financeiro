@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
+    "test": "node --test tests/*.test.mjs",
     "dev": "pnpm --filter @base/financeiro dev",
     "dev:financeiro": "pnpm --filter @base/financeiro dev",
     "dev:manutencao-sites": "pnpm --filter @base/manutencao-sites dev",
@@ -12,5 +13,8 @@
     "preview": "pnpm --filter @base/financeiro preview",
     "preview:manutencao-sites": "pnpm --filter @base/manutencao-sites preview"
   },
-  "packageManager": "pnpm@11.16.0"
+  "packageManager": "pnpm@11.16.0",
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
+  }
 }

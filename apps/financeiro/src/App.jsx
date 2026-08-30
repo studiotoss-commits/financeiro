@@ -5,7 +5,8 @@ import Icon from './components/Icon';
 import ClientesView from './features/clients/ClientesView';
 import AuthGate from './features/auth/AuthGate';
 import { AreaChart, BF, Donut, Sparkline, brl, brl0, categoryBreakdown, fmtBR } from './lib/core';
-import { loadFinanceState, queueFinanceState } from './services/financeRepository';
+import { loadFinanceState } from './services/financeRepository';
+import { clientSaveError, findDuplicateClient } from './services/clientModel';
 import { sendFeedback } from './services/feedbackService';
 
 // app.jsx — BASE Financeiro: full navigable app (Direction B). Needs icons.jsx + core.jsx.
@@ -588,7 +589,7 @@ function LancamentoModal({ initial, onClose, onSave, categories, clients, suppli
   const [err, setErr] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const cats = categories[type];
-  const entities = type === 'income' ? clients : suppliers;
+  const entities = type === 'income' ? clients.filter(c => !c.archivedAt || c.id === entityId) : suppliers;
   const matches = entity.length >= 3 ? entities.filter(x => x.name.toLowerCase().includes(entity.toLowerCase())).slice(0, 6) : [];
 
   const draftState = { type, desc, amount: String(amount), date, dueDate, cat, entity, entityId: String(entityId), status, launchMode, installments: String(installments), installmentNumber: String(installmentNumber), paymentMethod, bankAccount, boletoIssuedAt, boletoDetails, incomeType, recurringCategory, isRecurring, recurrenceCadence, recurrenceCount: String(recurrenceCount), hasInvoice, invoiceIssuedAt };
@@ -766,27 +767,35 @@ function FinanceApp({ user, onLogout, onUpdatePassword }) {
   const [workspaceId, setWorkspaceId] = useState(null);
   const [dataStatus, setDataStatus] = useState('loading');
   const [syncStatus, setSyncStatus] = useState('saved');
+  const [syncError, setSyncError] = useState('');
+  const persistenceRef = useRef(null);
+  const skipInitialSave = useRef(true);
 
   useEffect(() => {
     let active = true;
     loadFinanceState(user).then((state) => {
       if (!active) return;
+      persistenceRef.current = state.save;
+      skipInitialSave.current = true;
       setEntries(normalizeEntries(state.entries).filter((entry) => !entry.isTaxForecast));
       setClients(state.clients); setSuppliers(state.suppliers); setCategories({ income: CATS_IN, expense: CATS_OUT, supplier: CATS_SUPPLIER, bank: CATS_BANK, ...state.categories });
       setTaxRate(state.taxRate); setAccount(state.account); setWorkspaceId(state.workspaceId);
       setDataStatus('ready');
     }).catch(() => active && setDataStatus('error'));
     return () => { active = false; };
-  }, [user]);
+  }, [user.id]);
 
   useEffect(() => {
     if (dataStatus !== 'ready' || !workspaceId) return undefined;
+    if (skipInitialSave.current) { skipInitialSave.current = false; return undefined; }
+    let active = true;
     setSyncStatus('saving');
     const timer = setTimeout(() => {
-      queueFinanceState({ workspaceId, entries, clients, suppliers, categories, taxRate, account })
-        .then(() => setSyncStatus('saved')).catch(() => setSyncStatus('error'));
+      persistenceRef.current({ workspaceId, entries, clients, suppliers, categories, taxRate, account })
+        .then(() => { if (active) { setSyncStatus('saved'); setSyncError(''); } })
+        .catch(error => { if (active) { setSyncStatus('error'); setSyncError(clientSaveError(error)); } });
     }, 450);
-    return () => clearTimeout(timer);
+    return () => { active = false; clearTimeout(timer); };
   }, [dataStatus, workspaceId, entries, clients, suppliers, categories, taxRate, account]);
 
   const monthKey = `${cm.y}-${String(cm.m + 1).padStart(2, '0')}`;
@@ -851,16 +860,18 @@ function FinanceApp({ user, onLogout, onUpdatePassword }) {
   const notify = (msg) => { setToast(msg); clearTimeout(window.__t); window.__t = setTimeout(() => setToast(''), 2400); };
   const confirmEntryDelete = () => { setEntries((arr) => arr.filter((e) => e.id !== deleteEntry.id)); setDeleteEntry(null); setModal(null); notify('Lançamento excluído'); };
   const saveClient = (payload) => {
+    if (findDuplicateClient(clients, payload)) { notify('Este CPF/CNPJ já existe na central. Use ou edite o cadastro existente.'); return false; }
     if (payload.id) setClients((arr) => arr.map((c) => c.id === payload.id ? payload : c));
     else setClients((arr) => [{ ...payload, id: crypto.randomUUID() }, ...arr]);
+    return true;
   };
-  const deleteClient = (id) => setClients((arr) => arr.filter((c) => c.id !== id));
+  const deleteClient = (id) => setClients((arr) => arr.map(c => c.id === id ? { ...c, archivedAt: c.archivedAt ? null : new Date().toISOString() } : c));
   const saveSupplier = (payload) => setSuppliers((arr) => payload.id ? arr.map((supplier) => supplier.id === payload.id ? payload : supplier) : [{ ...payload, id: crypto.randomUUID() }, ...arr]);
   const deleteSupplier = (id) => setSuppliers((arr) => arr.filter((supplier) => supplier.id !== id));
   const addCategory = (type, name) => setCategories(s => (s[type] || []).includes(name) ? s : {...s,[type]:[...(s[type] || []),name]});
   const renameCategory = (type, oldName, newName) => { setCategories(s=>({...s,[type]:(s[type] || []).map(x=>x===oldName?newName:x)})); if(type==='supplier')setSuppliers(arr=>arr.map(supplier=>supplier.segment===oldName?{...supplier,segment:newName}:supplier));else if(type==='bank')setEntries(arr=>arr.map(entry=>entry.bankAccount===oldName?{...entry,bankAccount:newName,history:[...(entry.history||[]),{at:new Date().toISOString(),text:`Banco alterado de ${oldName} para ${newName}`}]}:entry));else setEntries(arr=>arr.map(e=>e.type===type&&e.cat===oldName?{...e,cat:newName,history:[...(e.history||[]),{at:new Date().toISOString(),text:`Categoria alterada de ${oldName} para ${newName}`}]}:e)); };
   const deleteCategory = (type, name) => setCategories(s=>({...s,[type]:(s[type] || []).filter(x=>x!==name)}));
-  const quickEntity = (type, data) => { const created={id:crypto.randomUUID(),name:data.name,email:'',contact:'',segment:'Cadastro rápido',status:'Ativo',contracts:[],renewals:[],interactions:[],resp:{name:'—',email:'—'},fin:{name:'—',email:'—'}}; if(type==='income')setClients(a=>[created,...a]);else setSuppliers(a=>[created,...a]); return created; };
+  const quickEntity = (type, data) => { const existing=(type==='income'?clients:suppliers).find(c=>!c.archivedAt&&c.name.trim().toLocaleLowerCase('pt-BR')===data.name.trim().toLocaleLowerCase('pt-BR')); if(existing)return existing; const created={id:crypto.randomUUID(),name:data.name,email:'',contact:'',segment:'Cadastro rápido',status:'Ativo',contracts:[],renewals:[],interactions:[],resp:{name:'—',email:'—'},fin:{name:'—',email:'—'}}; if(type==='income')setClients(a=>[created,...a]);else setSuppliers(a=>[created,...a]); return created; };
   const changePaymentStatus = (entry, paid) => {
     if (paid) { setSettlement(entry); return; }
     const now = new Date().toISOString();
@@ -893,6 +904,7 @@ function FinanceApp({ user, onLogout, onUpdatePassword }) {
         <main className="fx-main">
           <Topbar view={view} query={query} setQuery={setQuery} onNew={newForView} onBurger={() => setDrawer(true)} syncStatus={syncStatus} />
           <div className="fx-content">
+            {syncError && <div className="fx-central-alert" role="alert"><Icon name="alert-circle" size={20}/><div><strong>Alterações ainda não confirmadas no banco</strong><p>{syncError}</p><button className="fx-btn sm" onClick={()=>{const blob=new Blob([JSON.stringify({workspaceId,entries,clients,suppliers,categories,taxRate,account},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='BASE-alteracoes-nao-confirmadas.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>Baixar cópia das alterações</button> <button className="fx-btn sm" onClick={()=>{if(window.confirm('Recarregar descarta alterações que não foram salvas. Baixe uma cópia antes, se necessário. Continuar?'))window.location.reload();}}>Recarregar dados</button></div></div>}
             <div className="fx-pagehead">
               <div>
                 <p className="fx-eyebrow">{view === 'dashboard' ? 'Visão geral' : view === 'relatorios' ? 'Análise' : view === 'clientes' || view === 'fornecedores' ? 'Cadastros' : 'Financeiro'}</p>

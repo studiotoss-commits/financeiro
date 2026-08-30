@@ -60,18 +60,23 @@ function TopBuyers({ clients, entries, onOpen, onViewAll, full = false }) {
 }
 // ---------- lista ----------
 function ClientList({ clients, entries, query, onOpen, onEdit, onDelete, onNew, onViewAll, full = false }) {
-  const filtered = clients.filter((c) => !query || (c.name + c.segment + c.cnpj + (c.resp?.email || '')).toLowerCase().includes(query.toLowerCase()));
+  const [archiveFilter, setArchiveFilter] = useState('ativos');
+  const [scope, setScope] = useState('todos');
+  const filtered = clients.filter((c) => (archiveFilter==='todos'||(archiveFilter==='arquivados'?!!c.archivedAt:!c.archivedAt))
+    && (scope==='todos'||(scope==='financeiro'?clientEntries(c,entries).length>0:clientEntries(c,entries).length===0))
+    && (!query || (c.name + (c.tradeName||'') + c.segment + c.cnpj + (c.resp?.email || '') + (c.fin?.email||'')).toLowerCase().includes(query.toLowerCase())));
   const sorted = [...filtered].sort((a, b) => (a.tradeName || a.name).localeCompare(b.tradeName || b.name, 'pt-BR'));
   const rows = full ? sorted : sorted.slice(0, 5);
   return (
     <div className="fx-card fx-pad">
       <div className="fx-card-head">
-        <div><h3 className="fx-card-title">{full ? 'Todos os clientes cadastrados' : 'Todos os clientes'}</h3><p className="fx-card-sub">{full ? `${rows.length} cadastros em ordem alfabética` : `Exibindo ${rows.length} de ${sorted.length} cadastros`}</p></div>
+        <div><h3 className="fx-card-title">Central de clientes do BASE</h3><p className="fx-card-sub">{full ? `${rows.length} cadastros em ordem alfabética` : `Exibindo ${rows.length} de ${sorted.length} cadastros`} · Cadastro único por empresa</p></div>
         <div className="fx-card-actions">{!full && <button className="fx-link" onClick={onViewAll}>Ver todos<Icon name="chevron-right" size={15}/></button>}<button className="fx-btn sm" onClick={onNew}><Icon name="plus" size={16}/>Novo cliente</button></div>
       </div>
+      <div className="fx-central-filters"><label>Situação do cadastro<select className="fx-select" value={archiveFilter} onChange={e=>setArchiveFilter(e.target.value)}><option value="ativos">Não arquivados</option><option value="arquivados">Arquivados</option><option value="todos">Todos os cadastros</option></select></label><label>Uso no Financeiro<select className="fx-select" value={scope} onChange={e=>setScope(e.target.value)}><option value="todos">Todos os clientes do BASE</option><option value="financeiro">Com lançamentos financeiros</option><option value="sem">Sem lançamentos financeiros</option></select></label></div>
       {rows.length ? rows.map((c) => {
         const ltv = revenueStats(c, entries).revenue;
-        return <div className="fx-contact" key={c.id} onClick={() => onOpen(c)} style={{cursor:'pointer'}}><div className="fx-contact-ic">{initials(c.tradeName || c.name)}</div><div className="fx-contact-main"><p className="fx-contact-name">{c.tradeName || c.name}</p><p className="fx-contact-sub"><Icon name="briefcase" size={13}/>{c.segment} · desde {fmtSince(c.since)}</p></div><div className="fx-contact-right"><span className={'fx-badge ' + statusClass(c.status)}>{c.status}</span><div className="fx-contact-amt"><div className="lb">LTV</div><div className="vl fx-num">{ltv > 0 ? brl0(ltv) : '—'}</div></div><div className="fx-row-actions" onClick={(e)=>e.stopPropagation()}><button className="fx-icon sm" title="Visualizar" onClick={()=>onOpen(c)}><Icon name="search" size={15}/></button><button className="fx-icon sm" title="Editar" onClick={()=>onEdit(c)}><Icon name="pencil" size={16}/></button><button className="fx-icon sm danger" title="Excluir" onClick={()=>onDelete(c)}><Icon name="trash" size={16}/></button></div></div></div>;
+        return <div className="fx-contact" key={c.id} onClick={() => onOpen(c)} style={{cursor:'pointer'}}><div className="fx-contact-ic">{initials(c.tradeName || c.name)}</div><div className="fx-contact-main"><p className="fx-contact-name">{c.tradeName || c.name}</p><p className="fx-contact-sub"><Icon name="briefcase" size={13}/>{c.segment} · desde {fmtSince(c.since)}</p></div><div className="fx-contact-right"><span className={'fx-badge ' + statusClass(c.status)}>{c.archivedAt ? 'Arquivado' : c.status}</span><div className="fx-contact-amt"><div className="lb">LTV</div><div className="vl fx-num">{ltv > 0 ? brl0(ltv) : '—'}</div></div><div className="fx-row-actions" onClick={(e)=>e.stopPropagation()}><button className="fx-icon sm" title="Visualizar" onClick={()=>onOpen(c)}><Icon name="search" size={15}/></button><button className="fx-icon sm" title="Editar" onClick={()=>onEdit(c)}><Icon name="pencil" size={16}/></button><button className="fx-icon sm danger" title={c.archivedAt ? 'Restaurar cadastro' : 'Arquivar cadastro'} onClick={()=>onDelete(c)}><Icon name="trash" size={16}/></button></div></div></div>;
       }) : <div className="fx-empty"><div className="ic"><Icon name="users" size={26}/></div><p>Nenhum cliente encontrado.</p></div>}
     </div>
   );
@@ -164,7 +169,7 @@ function ClientDetail({ client, entries, onBack, onEdit, onDelete }) {
         <button className="fx-back" onClick={onBack}><Icon name="arrow-left" size={18} />Clientes</button>
         <div className="fx-detail-actions">
           <button className="fx-btn ghost sm" onClick={() => onEdit(c)}><Icon name="pencil" size={16} />Editar</button>
-          <button className="fx-btn danger-outline sm" onClick={() => onDelete(c)}><Icon name="trash" size={16} />Excluir</button>
+          <button className="fx-btn danger-outline sm" onClick={() => onDelete(c)}><Icon name="users" size={16} />{c.archivedAt ? 'Restaurar cadastro' : 'Arquivar cadastro'}</button>
         </div>
       </div>
 
@@ -174,7 +179,8 @@ function ClientDetail({ client, entries, onBack, onEdit, onDelete }) {
           <div className="fx-profile-name">{c.name}</div>
           <div className="fx-profile-seg">{c.tradeName || c.name} · {c.segment}</div>
           <div className="fx-profile-tags">
-            <span className={'fx-badge ' + statusClass(c.status)}>{c.status}</span>
+            <span className="fx-badge indigo">Cadastro central BASE</span>{c.archivedAt && <span className="fx-badge amber">Arquivado</span>}
+            <span className={'fx-badge ' + statusClass(c.status)}>{c.archivedAt ? 'Arquivado' : c.status}</span>
             <span className="fx-badge"><Icon name="calendar" size={12} />Cliente desde {fmtSince(c.since)}</span>
           </div>
         </div>
@@ -188,16 +194,17 @@ function ClientDetail({ client, entries, onBack, onEdit, onDelete }) {
       <div className="fx-detail-tabs">{[['dados','Dados cadastrais'],['contracts','Serviços e contratações'],['finance','Financeiro'],['renewals','Renovações'],['relations','Relacionamento']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>)}</div>
 
       {tab === 'dados' && <div className="fx-card fx-pad">
-        <div className="fx-card-head"><h3 className="fx-card-title">Dados cadastrais</h3></div>
+        <div className="fx-card-head"><div><h3 className="fx-card-title">Dados compartilhados do BASE</h3><p className="fx-card-sub">Editar estes dados atualiza o cadastro central. Contratos e lançamentos permanecem no Financeiro.</p></div></div>
         <div className="fx-info-grid">
           <InfoField icon="building" label="Empresa" value={c.name} sub={c.segment} />
           <InfoField icon="building-store" label="Nome fantasia" value={c.tradeName} />
-          <InfoField icon="receipt" label="CNPJ" value={c.cnpj} />
+          <InfoField icon="receipt" label="CPF/CNPJ" value={c.cnpj} />
           <InfoField icon="world" label="Endereço completo" value={c.address} />
           <ContactPerson icon="user-circle" label="Responsável" contact={responsible} />
           <InfoField icon="receipt" label="Inscrições" value={c.stateRegistration ? `IE: ${c.stateRegistration}` : 'IE: —'} sub={c.cityRegistration ? `IM: ${c.cityRegistration}` : 'IM: —'} />
           <InfoField icon="sparkles" label="Origem do cliente" value={c.origin} />
           <ContactPerson icon="briefcase" label="Responsável financeiro" contact={financial} />
+          <ContactPerson icon="user-circle" label="Responsável técnico" contact={c.technical} />
           <InfoField icon="calendar" label="Cliente desde" value={fmtSince(c.since)} />
         </div>
       </div>}
@@ -232,9 +239,10 @@ function ClienteModal({ initial, onClose, onSave }) {
   const initialForm = {
     name: initial.name || '', cnpj: initial.cnpj || '', segment: initial.segment || '',
     tradeName: initial.tradeName || initial.name || '', stateRegistration: initial.stateRegistration || '', cityRegistration: initial.cityRegistration || '', origin: initial.origin || '',
-    address: initial.address || '', status: initial.status || 'Ativo', since: initial.since || '2026-06',
+    address: initial.address || '', status: initial.status || 'Ativo', since: initial.since || new Date().toISOString().slice(0,7),
     respName: initial.resp?.name || '', respPhone: initial.resp?.phone || initial.phones?.[0]?.value || initial.phone || '', respMobile: initial.resp?.mobile || initial.whatsapps?.[0]?.value || initial.whatsapp || '', respEmail: initial.resp?.email || initial.emails?.[0]?.value || '',
     finName: initial.fin?.name || '', finPhone: initial.fin?.phone || '', finMobile: initial.fin?.mobile || '', finEmail: initial.fin?.email || '',
+    technicalName: initial.technical?.name || '', technicalMobile: initial.technical?.mobile || '', technicalEmail: initial.technical?.email || '',
   };
   const [f, setF] = useState(initialForm);
   const [err, setErr] = useState(false);
@@ -250,6 +258,7 @@ function ClienteModal({ initial, onClose, onSave }) {
       address: f.address.trim() || '—', status: f.status, since: f.since,
       resp: { name: f.respName.trim() || '—', phone: f.respPhone.trim(), mobile: f.respMobile.trim(), email: f.respEmail.trim() },
       fin: { name: f.finName.trim() || '—', phone: f.finPhone.trim(), mobile: f.finMobile.trim(), email: f.finEmail.trim() },
+      technical: { ...initial.technical, name: f.technicalName.trim(), mobile: f.technicalMobile.trim(), email: f.technicalEmail.trim() },
     });
   };
   return (
@@ -259,53 +268,56 @@ function ClienteModal({ initial, onClose, onSave }) {
         <div className="fx-modal-head">
           <div>
             <h2>{isEdit ? 'Editar cliente' : 'Novo cliente'}</h2>
-            <p>{isEdit ? 'Atualize os dados cadastrais.' : 'Cadastre uma nova empresa cliente.'}</p>
+            <p>{isEdit ? 'Alterações cadastrais ficam disponíveis aos apps conectados à central.' : 'Um cadastro único no BASE, disponível para os apps da sua empresa.'}</p>
           </div>
           <button className="fx-icon sm" onClick={requestClose}><Icon name="x" size={18} /></button>
         </div>
         <div className="fx-modal-body">
           <div className="fx-row2">
             <div className="fx-field"><label>Razão Social</label>
-              <input className="fx-input" value={f.name} onChange={set('name')} placeholder="Ex: Horizonte Digital"
+              <input className="fx-input" aria-label="Razão Social" value={f.name} onChange={set('name')} placeholder="Ex: Horizonte Digital"
                 style={err && !f.name.trim() ? { borderColor: 'var(--neg)' } : null} />
             </div>
-            <div className="fx-field"><label>Nome Fantasia</label><input className="fx-input" value={f.tradeName} onChange={set('tradeName')} /></div>
+            <div className="fx-field"><label>Nome Fantasia</label><input className="fx-input" aria-label="Nome Fantasia" value={f.tradeName} onChange={set('tradeName')} /></div>
           </div>
           <div className="fx-row2">
-            <div className="fx-field"><label>CNPJ</label><input className="fx-input fx-num" value={f.cnpj} onChange={set('cnpj')} placeholder="00.000.000/0001-00" /></div>
-            <div className="fx-field"><label>Segmento</label><input className="fx-input" value={f.segment} onChange={set('segment')} placeholder="Ex: Tecnologia" /></div>
+            <div className="fx-field"><label>CPF/CNPJ</label><input className="fx-input fx-num" aria-label="CPF/CNPJ" value={f.cnpj} onChange={set('cnpj')} placeholder="00.000.000/0001-00" /></div>
+            <div className="fx-field"><label>Segmento</label><input className="fx-input" aria-label="Segmento" value={f.segment} onChange={set('segment')} placeholder="Ex: Tecnologia" /></div>
           </div>
           <div className="fx-field">
             <label>Endereço completo</label>
-            <input className="fx-input" value={f.address} onChange={set('address')} placeholder="Rua, número, bairro, cidade/UF, CEP" />
+            <input className="fx-input" aria-label="Endereço completo" value={f.address} onChange={set('address')} placeholder="Rua, número, bairro, cidade/UF, CEP" />
           </div>
           <div className="fx-fieldset"><span className="fx-fieldset-lb">Responsável</span></div>
           <div className="fx-row2">
-            <div className="fx-field"><label>Nome</label><input className="fx-input" value={f.respName} onChange={set('respName')} placeholder="Nome do responsável" /></div>
-            <div className="fx-field"><label>Telefone (fixo)</label><input className="fx-input" type="tel" value={f.respPhone} onChange={set('respPhone')} placeholder="(11) 3333-4444" /></div>
+            <div className="fx-field"><label>Nome</label><input className="fx-input" aria-label="Nome" value={f.respName} onChange={set('respName')} placeholder="Nome do responsável" /></div>
+            <div className="fx-field"><label>Telefone (fixo)</label><input className="fx-input" aria-label="Telefone (fixo)" type="tel" value={f.respPhone} onChange={set('respPhone')} placeholder="(11) 3333-4444" /></div>
           </div>
           <div className="fx-row2">
-            <div className="fx-field"><label>Celular / WhatsApp</label><input className="fx-input" type="tel" value={f.respMobile} onChange={set('respMobile')} placeholder="(11) 99999-0000" /></div>
-            <div className="fx-field"><label>E-mail</label><input className="fx-input" type="email" value={f.respEmail} onChange={set('respEmail')} placeholder="email@empresa.com" /></div>
+            <div className="fx-field"><label>Celular / WhatsApp</label><input className="fx-input" aria-label="Celular / WhatsApp" type="tel" value={f.respMobile} onChange={set('respMobile')} placeholder="(11) 99999-0000" /></div>
+            <div className="fx-field"><label>E-mail</label><input className="fx-input" aria-label="E-mail" type="email" value={f.respEmail} onChange={set('respEmail')} placeholder="email@empresa.com" /></div>
           </div>
-          <div className="fx-row2"><div className="fx-field"><label>Inscrição Estadual</label><input className="fx-input" value={f.stateRegistration} onChange={set('stateRegistration')} /></div><div className="fx-field"><label>Inscrição Municipal</label><input className="fx-input" value={f.cityRegistration} onChange={set('cityRegistration')} /></div></div>
+          <div className="fx-row2"><div className="fx-field"><label>Inscrição Estadual</label><input className="fx-input" aria-label="Inscrição Estadual" value={f.stateRegistration} onChange={set('stateRegistration')} /></div><div className="fx-field"><label>Inscrição Municipal</label><input className="fx-input" aria-label="Inscrição Municipal" value={f.cityRegistration} onChange={set('cityRegistration')} /></div></div>
           <div className="fx-field"><label>Origem do cliente</label><select className="fx-select" value={f.origin} onChange={set('origin')}><option value="">Selecione uma origem</option><option>Indicação</option><option>Mídia paga</option><option>Orgânico</option><option>Redes sociais</option>{f.origin && !['Indicação','Mídia paga','Orgânico','Redes sociais'].includes(f.origin) && <option value={f.origin}>{f.origin} (cadastro anterior)</option>}</select></div>
           <div className="fx-fieldset"><span className="fx-fieldset-lb">Responsável financeiro</span></div>
           <div className="fx-row2">
-            <div className="fx-field"><label>Nome</label><input className="fx-input" value={f.finName} onChange={set('finName')} placeholder="Nome do financeiro" /></div>
-            <div className="fx-field"><label>Telefone (fixo)</label><input className="fx-input" type="tel" value={f.finPhone} onChange={set('finPhone')} placeholder="(11) 3333-4444" /></div>
+            <div className="fx-field"><label>Nome</label><input className="fx-input" aria-label="Nome" value={f.finName} onChange={set('finName')} placeholder="Nome do financeiro" /></div>
+            <div className="fx-field"><label>Telefone (fixo)</label><input className="fx-input" aria-label="Telefone (fixo)" type="tel" value={f.finPhone} onChange={set('finPhone')} placeholder="(11) 3333-4444" /></div>
           </div>
           <div className="fx-row2">
-            <div className="fx-field"><label>Celular / WhatsApp</label><input className="fx-input" type="tel" value={f.finMobile} onChange={set('finMobile')} placeholder="(11) 99999-0000" /></div>
-            <div className="fx-field"><label>E-mail</label><input className="fx-input" type="email" value={f.finEmail} onChange={set('finEmail')} placeholder="financeiro@empresa.com" /></div>
+            <div className="fx-field"><label>Celular / WhatsApp</label><input className="fx-input" aria-label="Celular / WhatsApp" type="tel" value={f.finMobile} onChange={set('finMobile')} placeholder="(11) 99999-0000" /></div>
+            <div className="fx-field"><label>E-mail</label><input className="fx-input" aria-label="E-mail" type="email" value={f.finEmail} onChange={set('finEmail')} placeholder="financeiro@empresa.com" /></div>
           </div>
+          <div className="fx-fieldset"><span className="fx-fieldset-lb">Responsável técnico</span></div>
+          <div className="fx-row2"><div className="fx-field"><label>Nome do contato técnico</label><input className="fx-input" aria-label="Nome do contato técnico" value={f.technicalName} onChange={set('technicalName')} /></div><div className="fx-field"><label>WhatsApp técnico</label><input className="fx-input" aria-label="WhatsApp técnico" type="tel" value={f.technicalMobile} onChange={set('technicalMobile')} /></div></div>
+          <div className="fx-field"><label>E-mail técnico</label><input className="fx-input" aria-label="E-mail técnico" type="email" value={f.technicalEmail} onChange={set('technicalEmail')} /></div>
           <div className="fx-row2">
             <div className="fx-field"><label>Status</label>
               <select className="fx-select" value={f.status} onChange={set('status')}>
                 <option>Ativo</option><option>Recorrente</option><option>Prospect</option><option>Inativo</option>
               </select>
             </div>
-            <div className="fx-field"><label>Cliente desde</label><input className="fx-input fx-num" type="month" value={f.since} onChange={set('since')} /></div>
+            <div className="fx-field"><label>Cliente desde</label><input className="fx-input fx-num" aria-label="Cliente desde" type="month" value={f.since} onChange={set('since')} /></div>
           </div>
         </div>
         <div className="fx-modal-foot">
@@ -325,14 +337,14 @@ function ConfirmDelete({ client, onClose, onConfirm }) {
       <div className="fx-modal" style={{ width: 'min(420px,100%)' }}>
         <div className="fx-modal-body" style={{ alignItems: 'center', textAlign: 'center', paddingTop: 30 }}>
           <div className="fx-confirm-ic"><Icon name="trash" size={26} /></div>
-          <h2 style={{ margin: '4px 0 0', fontSize: 19, fontWeight: 800, letterSpacing: '-.03em' }}>Excluir cliente?</h2>
+          <h2 style={{ margin: '4px 0 0', fontSize: 19, fontWeight: 800, letterSpacing: '-.03em' }}>{client.archivedAt ? 'Restaurar cadastro?' : 'Arquivar cadastro?'}</h2>
           <p style={{ margin: '8px 0 0', color: 'var(--muted)', fontSize: 14, lineHeight: 1.5 }}>
-            <b>{client.name}</b> e todo o seu histórico de contratações serão removidos. Esta ação não pode ser desfeita.
+            <b>{client.name}</b> {client.archivedAt ? 'voltará a aparecer na seleção de clientes.' : 'sairá da seleção de novos serviços e lançamentos nos apps conectados à central.'} Contratos, lançamentos e históricos serão preservados. Isso não cancela serviços nem cobranças.
           </p>
         </div>
         <div className="fx-modal-foot">
           <button className="fx-modal-cancel" onClick={onClose}>Cancelar</button>
-          <button className="fx-modal-save danger" onClick={onConfirm}><Icon name="trash" size={16} />Excluir</button>
+          <button className="fx-modal-save" onClick={onConfirm}><Icon name="users" size={16} />{client.archivedAt ? 'Restaurar' : 'Arquivar'}</button>
         </div>
       </div>
     </div>
@@ -349,11 +361,11 @@ export default function ClientesView({ clients, entries, query, onSave, onDelete
   const selected = clients.find((c) => String(c.id) === routeId) || null;
 
   const open = (c) => { navigate(`/clientes/${c.id}`); window.scrollTo?.(0, 0); };
-  const save = (payload) => { onSave(payload); setModal(null); notify(payload.id ? 'Cliente atualizado' : 'Cliente cadastrado'); };
+  const save = (payload) => { if(onSave(payload)===false)return; setModal(null); notify(payload.id ? 'Salvando alterações na central…' : 'Salvando cliente na central…'); };
   const confirmDel = () => {
     onDelete(del.id);
     if (selected?.id === del.id) navigate('/clientes');
-    notify('Cliente excluído');
+    notify(del.archivedAt ? 'Restaurando cadastro…' : 'Arquivando cadastro, sem apagar o histórico…');
     setDel(null);
   };
 
