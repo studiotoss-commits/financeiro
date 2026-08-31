@@ -6,7 +6,7 @@ import ClientesView from './features/clients/ClientesView';
 import AuthGate from './features/auth/AuthGate';
 import { AreaChart, BF, Donut, Sparkline, brl, brl0, categoryBreakdown, fmtBR } from './lib/core';
 import { loadFinanceState } from './services/financeRepository';
-import { clientSaveError, findDuplicateClient } from './services/clientModel';
+import { clientSaveError, findDuplicateClient, operationalEntries } from './services/clientModel';
 import { sendFeedback } from './services/feedbackService';
 
 // app.jsx — BASE Financeiro: full navigable app (Direction B). Needs icons.jsx + core.jsx.
@@ -590,7 +590,7 @@ function LancamentoModal({ initial, onClose, onSave, categories, clients, suppli
   const [err, setErr] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const cats = categories[type];
-  const entities = type === 'income' ? clients.filter(c => !c.archivedAt || c.id === entityId) : suppliers;
+  const entities = type === 'income' ? clients.filter(c => (!c.archivedAt&&!c.appArchivedAt) || c.id === entityId) : suppliers;
   const matches = entity.length >= 3 ? entities.filter(x => x.name.toLowerCase().includes(entity.toLowerCase())).slice(0, 6) : [];
 
   const draftState = { type, desc, amount: String(amount), date, dueDate, cat, entity, entityId: String(entityId), status, launchMode, installments: String(installments), installmentNumber: String(installmentNumber), paymentMethod, bankAccount, boletoIssuedAt, boletoDetails, incomeType, recurringCategory, isRecurring, recurrenceCadence, recurrenceCount: String(recurrenceCount), hasInvoice, invoiceIssuedAt };
@@ -766,6 +766,7 @@ function FinanceApp({ user, onLogout, onUpdatePassword }) {
   const [suppliers, setSuppliers] = useState([]);
   const [account, setAccount] = useState({ company:'BASE Financeiro', owner:BF.user.name, email:user.email || '', taxRate:0 });
   const [workspaceId, setWorkspaceId] = useState(null);
+  const [centralManager,setCentralManager]=useState(false);
   const [dataStatus, setDataStatus] = useState('loading');
   const [syncStatus, setSyncStatus] = useState('saved');
   const [syncError, setSyncError] = useState('');
@@ -780,7 +781,7 @@ function FinanceApp({ user, onLogout, onUpdatePassword }) {
       skipInitialSave.current = true;
       setEntries(normalizeEntries(state.entries).filter((entry) => !entry.isTaxForecast));
       setClients(state.clients); setSuppliers(state.suppliers); setCategories({ income: CATS_IN, expense: CATS_OUT, supplier: CATS_SUPPLIER, bank: CATS_BANK, ...state.categories });
-      setTaxRate(state.taxRate); setAccount(state.account); setWorkspaceId(state.workspaceId);
+      setTaxRate(state.taxRate); setAccount(state.account); setWorkspaceId(state.workspaceId);setCentralManager(state.centralManager);
       setDataStatus('ready');
     }).catch(() => active && setDataStatus('error'));
     return () => { active = false; };
@@ -799,8 +800,16 @@ function FinanceApp({ user, onLogout, onUpdatePassword }) {
     return () => { active = false; clearTimeout(timer); };
   }, [dataStatus, workspaceId, entries, clients, suppliers, categories, taxRate, account]);
 
+  async function reloadAfterLifecycle(){
+    const state=await loadFinanceState(user);
+    persistenceRef.current=state.save;skipInitialSave.current=true;
+    setEntries(normalizeEntries(state.entries).filter(e=>!e.isTaxForecast));setClients(state.clients);setSuppliers(state.suppliers);
+    setCategories(state.categories);setTaxRate(state.taxRate);setAccount(state.account);setCentralManager(state.centralManager);
+    setSyncStatus('saved');setSyncError('');
+  }
+  const visibleEntries=useMemo(()=>operationalEntries(entries,clients),[entries,clients]);
   const monthKey = `${cm.y}-${String(cm.m + 1).padStart(2, '0')}`;
-  const monthEntries = useMemo(() => entries.filter((e) => e.date.startsWith(monthKey)), [entries, monthKey]);
+  const monthEntries = useMemo(() => visibleEntries.filter((e) => e.date.startsWith(monthKey)), [visibleEntries, monthKey]);
   const filtered = useMemo(() => {
     if (!query.trim()) return monthEntries;
     const q = query.toLowerCase();
@@ -866,13 +875,12 @@ function FinanceApp({ user, onLogout, onUpdatePassword }) {
     else setClients((arr) => [{ ...payload, id: crypto.randomUUID() }, ...arr]);
     return true;
   };
-  const deleteClient = (id) => setClients((arr) => arr.map(c => c.id === id ? { ...c, archivedAt: c.archivedAt ? null : new Date().toISOString() } : c));
   const saveSupplier = (payload) => setSuppliers((arr) => payload.id ? arr.map((supplier) => supplier.id === payload.id ? payload : supplier) : [{ ...payload, id: crypto.randomUUID() }, ...arr]);
   const deleteSupplier = (id) => setSuppliers((arr) => arr.filter((supplier) => supplier.id !== id));
   const addCategory = (type, name) => setCategories(s => (s[type] || []).includes(name) ? s : {...s,[type]:[...(s[type] || []),name]});
   const renameCategory = (type, oldName, newName) => { setCategories(s=>({...s,[type]:(s[type] || []).map(x=>x===oldName?newName:x)})); if(type==='supplier')setSuppliers(arr=>arr.map(supplier=>supplier.segment===oldName?{...supplier,segment:newName}:supplier));else if(type==='bank')setEntries(arr=>arr.map(entry=>entry.bankAccount===oldName?{...entry,bankAccount:newName,history:[...(entry.history||[]),{at:new Date().toISOString(),text:`Banco alterado de ${oldName} para ${newName}`}]}:entry));else setEntries(arr=>arr.map(e=>e.type===type&&e.cat===oldName?{...e,cat:newName,history:[...(e.history||[]),{at:new Date().toISOString(),text:`Categoria alterada de ${oldName} para ${newName}`}]}:e)); };
   const deleteCategory = (type, name) => setCategories(s=>({...s,[type]:(s[type] || []).filter(x=>x!==name)}));
-  const quickEntity = (type, data) => { const existing=(type==='income'?clients:suppliers).find(c=>!c.archivedAt&&c.name.trim().toLocaleLowerCase('pt-BR')===data.name.trim().toLocaleLowerCase('pt-BR')); if(existing)return existing; const created={id:crypto.randomUUID(),name:data.name,email:'',contact:'',segment:'Cadastro rápido',status:'Ativo',contracts:[],renewals:[],interactions:[],resp:{name:'—',email:'—'},fin:{name:'—',email:'—'}}; if(type==='income')setClients(a=>[created,...a]);else setSuppliers(a=>[created,...a]); return created; };
+  const quickEntity = (type, data) => { const existing=(type==='income'?clients:suppliers).find(c=>!c.archivedAt&&!c.appArchivedAt&&c.name.trim().toLocaleLowerCase('pt-BR')===data.name.trim().toLocaleLowerCase('pt-BR')); if(existing)return existing; const created={id:crypto.randomUUID(),name:data.name,email:'',contact:'',segment:'Cadastro rápido',status:'Ativo',contracts:[],renewals:[],interactions:[],resp:{name:'—',email:'—'},fin:{name:'—',email:'—'}}; if(type==='income')setClients(a=>[created,...a]);else setSuppliers(a=>[created,...a]); return created; };
   const changePaymentStatus = (entry, paid) => {
     if (paid) { setSettlement(entry); return; }
     const now = new Date().toISOString();
@@ -919,7 +927,7 @@ function FinanceApp({ user, onLogout, onUpdatePassword }) {
             {view === 'entradas' && <ListPage kind="income" entries={sortedFiltered} clients={clients} onEdit={openEdit} onNew={() => openNew('income')} onPaymentStatus={changePaymentStatus} query={query} />}
             {view === 'saidas' && <ListPage kind="expense" entries={sortedFiltered} onEdit={openEdit} onNew={() => openNew('expense')} onPaymentStatus={changePaymentStatus} query={query} taxForecast={taxSummary.amount} taxRate={taxRate} invoiceCount={taxSummary.count} />}
             {view === 'relatorios' && <Relatorios entries={monthEntries} stats={stats} hasData={hasData} cm={cm} />}
-            {view === 'clientes' && <ClientesView clients={clients} entries={entries} query={query} onSave={saveClient} onDelete={deleteClient} notify={notify} />}
+            {view === 'clientes' && <ClientesView clients={clients} entries={entries} query={query} onSave={saveClient} workspaceId={workspaceId} canDelete={centralManager} syncReady={syncStatus==='saved'&&dataStatus==='ready'} onLifecycle={reloadAfterLifecycle} notify={notify} />}
             {view === 'fornecedores' && <ContactsPage query={query} suppliers={suppliers} supplierCategories={categories.supplier || []} onSave={saveSupplier} onDelete={deleteSupplier} notify={notify} />}
             {view === 'configuracoes' && <SettingsView account={{...account,taxRate}} onAccount={saveAccount} categories={categories} onAddCategory={addCategory} onRenameCategory={renameCategory} onDeleteCategory={deleteCategory} entries={entries} suppliers={suppliers} onUpdatePassword={onUpdatePassword} />}
           </div>

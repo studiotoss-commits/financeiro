@@ -13,6 +13,7 @@ export function addDays(date,days){const d=utcDay(date);d.setUTCDate(d.getUTCDat
 export function addMonths(date,months){const d=utcDay(date);const day=d.getUTCDate();d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()+Number(months));const end=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate();d.setUTCDate(Math.min(day,end));return d.toISOString().slice(0,10);}
 export function parseMoney(value){if(value.trim()==='')return null;if(!/^\d+(?:,\d{1,2})?$/.test(value.trim()))throw new Error('Informe o valor sem pontos de milhar, por exemplo: 149,90.');const [whole,decimal='']=value.trim().split(',');const cents=Number(whole)*100+Number(decimal.padEnd(2,'0'));if(!Number.isSafeInteger(cents)||cents>99999999999)throw new Error('Valor acima do limite permitido.');return cents;}
 export function urgency(service,today=todayISO()){
+  if(service.client_archived_at)return {label:'Arquivado no NOT',tone:'muted',group:'archived'};
   if(service.status!=='active')return {label:STATUSES[service.status],tone:'muted',group:'inactive'};
   const days=daysUntil(service.due_date,today);
   if(days<0)return {label:`Vencido há ${-days} dia${days===-1?'':'s'}`,tone:'danger',group:'overdue'};
@@ -20,7 +21,7 @@ export function urgency(service,today=todayISO()){
   return {label:`Em ${days} dia${days===1?'':'s'}`,tone:days<=2?'danger':days<=15?'warning':days<=30?'accent':'success',group:days<=2?'urgent':days<=30?'upcoming':'later'};
 }
 export function reminders(service,today=todayISO()){
-  if(service.status!=='active'||!service.due_date||service.recurrence_months==null)return [];
+  if(service.client_archived_at||service.status!=='active'||!service.due_date||service.recurrence_months==null)return [];
   return service.reminder_days.map(days=>{const date=addDays(service.due_date,-days);return {days,date,label:date===today?'Previsto para hoje':date<today?'Data já passou · sem envio':'Prévia programada'};});
 }
 export function safeLink(value){try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:null;}catch{return null;}}

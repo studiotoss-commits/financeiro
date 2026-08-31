@@ -42,7 +42,7 @@ export function ServiceForm({workspace,service,clients,onClientSaved,onClose,onS
   const [days,setDays]=useState(()=>(service?.reminder_days||[30,15,2]).join(', '));
   const [error,setError]=useState(''),[busy,setBusy]=useState(false),[newClient,setNewClient]=useState(false);
   const change=key=>e=>setForm(c=>({...c,[key]:e.target.value}));
-  const available=clients.filter(c=>!c.archived_at||c.id===form.client_id);
+  const available=clients.filter(c=>(!c.archived_at&&!c.app_archived_at)||c.id===form.client_id);
   const close=()=>{if(!busy)discard(onClose)();};
   async function submit(event){
     event.preventDefault();setError('');
@@ -106,12 +106,19 @@ export function ServiceDetail({workspace,service,client,onClose,onEdit,onRenew})
     <div className="not-modal-body">
       <div className="not-detail-grid"><div><small>Vencimento</small><strong>{dateBR(service.due_date)}</strong></div><div><small>Valor previsto</small><strong>{money(service.amount_cents)}</strong></div><div><small>Fornecedor</small><strong>{service.provider||'A confirmar'}</strong></div><div><small>Pagamento para</small><strong>{service.payee||'A confirmar'}</strong></div></div>
       <div className="not-inline-links">{[['Pagamento',service.payment_url],['Painel do fornecedor',service.panel_url],['Documento de acessos',service.document_url]].filter(([,url])=>safeLink(url)).map(([label,url])=><a key={label} href={url} target="_blank" rel="noopener noreferrer">{label}<Icon name="arrow-up-right" size={15}/></a>)}</div>
-      {client?.archived_at&&<p className="not-notice">Cliente arquivado na central. O serviço continua ativo até você pausá-lo ou cancelá-lo no NOT.</p>}
+      {client?.app_archived_at&&<p className="not-notice">Cliente e serviços arquivados no NOT. Histórico preservado, sem lembretes. Restaure o cliente para editar ou renovar. Os outros apps não são afetados.</p>}
       {service.notes&&<section><h3>Observações internas</h3><p className="not-preserve">{service.notes}</p></section>}
       <section><h3>Prévias de lembretes</h3><p className="not-hint">Envios desativados. Datas passadas não significam que o cliente foi avisado.</p><div className="not-reminder-chips">{reminders(service).map(r=><div key={r.days}><strong>{r.days} dias antes</strong><span>{dateBR(r.date)}</span><small>{r.label}</small></div>)}{service.status!=='active'&&<p>Serviço {STATUSES[service.status].toLowerCase()}: sem lembretes previstos.</p>}</div></section>
       <section><h3>Mensagem personalizada</h3><p className="not-hint">E-mail: {preview.contact.email||'não informado'} · WhatsApp: {preview.contact.whatsapp||'não informado'}</p>{service.document_url&&<label className="not-check"><input type="checkbox" checked={includeDoc} onChange={e=>setIncludeDoc(e.target.checked)}/>Incluir link do documento nesta prévia (confira a permissão de acesso)</label>}<div className="not-message"><strong>{preview.subject}</strong><pre>{preview.body}</pre></div><p className="not-hint">Somente visualização. Nenhum envio ou agendamento externo foi realizado.</p></section>
       <section><h3>Histórico do serviço</h3><ErrorBox error={historyError}/>{!events.length&&!historyError&&<p className="not-hint">Carregando histórico…</p>}<ol className="not-history">{events.map(e=><li key={e.id}><strong>{e.kind==='renewed'?'Pagamento / renovação confirmado':e.kind==='created'?'Serviço cadastrado':'Serviço atualizado'}</strong><small>{new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'short',timeZone:'America/Sao_Paulo'}).format(new Date(e.created_at))}</small>{e.kind==='renewed'&&<p>{dateBR(e.payload.previous_due)} → {e.payload.next_due?dateBR(e.payload.next_due):'Serviço concluído'} · {money(e.payload.amount_cents)} · pago em {dateBR(e.payload.paid_on)}</p>}</li>)}</ol></section>
-    </div><footer><button className="not-button secondary" onClick={onEdit}><Icon name="pencil" size={16}/>Editar serviço</button>{service.status==='active'&&<button className="not-button" onClick={onRenew}><Icon name="circle-check" size={16}/>Confirmar renovação</button>}</footer>
+    </div><footer>{!client?.app_archived_at&&<><button className="not-button secondary" onClick={onEdit}><Icon name="pencil" size={16}/>Editar serviço</button>{service.status==='active'&&<button className="not-button" onClick={onRenew}><Icon name="circle-check" size={16}/>Confirmar renovação</button>}</>}</footer>
   </Modal>;
+}
+
+export function ClientArchiveForm({workspace,client,count,onClose,onSaved}){
+  const [busy,setBusy]=useState(false),[error,setError]=useState('');
+  const restoring=!!client.app_archived_at;
+  async function confirm(){setBusy(true);setError('');try{await repo.archiveClient(workspace.id,client);onSaved();}catch(e){setError(/changed|revision/i.test(e.message)?'O cadastro mudou. Atualize os dados antes de tentar novamente.':'Não foi possível confirmar a operação. Atualize os dados antes de tentar novamente.');}finally{setBusy(false);}}
+  return <Modal title={restoring?'Restaurar cliente no NOT?':'Arquivar cliente no NOT?'} onClose={()=>!busy&&onClose()}><div className="not-modal-body"><p><strong>{client.payload.tradeName||client.name}</strong></p><p>{restoring?`O cadastro e os ${count} serviços voltarão às telas do NOT com as situações anteriores.`:`O cadastro e os ${count} serviços serão arquivados somente no NOT e sairão das telas operacionais e dos lembretes.`}</p><p>Os dados e históricos permanecem salvos. A central e os registros dos outros apps não serão alterados.</p><p>A exclusão definitiva só está disponível na Central de Clientes, dentro do Financeiro.</p><ErrorBox error={error}/></div><footer><button className="not-button secondary" disabled={busy} onClick={onClose}>Cancelar</button><button className="not-button" disabled={busy} onClick={confirm}>{busy?'Aguarde…':restoring?'Restaurar no NOT':'Arquivar somente no NOT'}</button></footer></Modal>;
 }
 

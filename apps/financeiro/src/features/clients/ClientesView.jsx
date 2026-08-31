@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../../components/Icon';
+import ConfirmDelete from './ClientActions';
 import { brl0, CADENCE_LABEL, clientLTV, clientMRR, clientTicket, fmtSince } from '../../lib/core';
 
 // clientes.jsx — BASE Financeiro: Cadastros › Clientes (ranking, lista, detalhe, modal).
@@ -15,7 +16,7 @@ const revenueStats = (client, entries) => {
   return { revenue, orders: rows.length, ticket: rows.length ? revenue / rows.length : 0, top: Object.entries(products).sort((a, b) => b[1] - a[1])[0]?.[0] || '—', profile: rows.length > 1 ? 'Recorrente' : rows.length === 1 ? 'Pontual' : 'Sem receita' };
 };
 
-const rankedClients = (clients, entries) => [...clients]
+const rankedClients = (clients, entries) => clients.filter(c=>!c.appArchivedAt&&!c.archivedAt)
   .map((c) => { const stats = revenueStats(c, entries); return { c, ...stats, ltv: stats.revenue }; })
   .sort((a, b) => b.ltv - a.ltv || a.c.name.localeCompare(b.c.name, 'pt-BR'));
 
@@ -60,9 +61,9 @@ function TopBuyers({ clients, entries, onOpen, onViewAll, full = false }) {
 }
 // ---------- lista ----------
 function ClientList({ clients, entries, query, onOpen, onEdit, onDelete, onNew, onViewAll, full = false }) {
-  const [archiveFilter, setArchiveFilter] = useState('ativos');
+  const [archiveFilter, setArchiveFilter] = useState('todos');
   const [scope, setScope] = useState('todos');
-  const filtered = clients.filter((c) => (archiveFilter==='todos'||(archiveFilter==='arquivados'?!!c.archivedAt:!c.archivedAt))
+  const filtered = clients.filter((c) => (archiveFilter==='todos'||(archiveFilter==='arquivados'?!!c.appArchivedAt:!c.appArchivedAt))
     && (scope==='todos'||(scope==='financeiro'?clientEntries(c,entries).length>0:clientEntries(c,entries).length===0))
     && (!query || (c.name + (c.tradeName||'') + c.segment + c.cnpj + (c.resp?.email || '') + (c.fin?.email||'')).toLowerCase().includes(query.toLowerCase())));
   const sorted = [...filtered].sort((a, b) => (a.tradeName || a.name).localeCompare(b.tradeName || b.name, 'pt-BR'));
@@ -73,10 +74,10 @@ function ClientList({ clients, entries, query, onOpen, onEdit, onDelete, onNew, 
         <div><h3 className="fx-card-title">Central de clientes do BASE</h3><p className="fx-card-sub">{full ? `${rows.length} cadastros em ordem alfabética` : `Exibindo ${rows.length} de ${sorted.length} cadastros`} · Cadastro único por empresa</p></div>
         <div className="fx-card-actions">{!full && <button className="fx-link" onClick={onViewAll}>Ver todos<Icon name="chevron-right" size={15}/></button>}<button className="fx-btn sm" onClick={onNew}><Icon name="plus" size={16}/>Novo cliente</button></div>
       </div>
-      <div className="fx-central-filters"><label>Situação do cadastro<select className="fx-select" value={archiveFilter} onChange={e=>setArchiveFilter(e.target.value)}><option value="ativos">Não arquivados</option><option value="arquivados">Arquivados</option><option value="todos">Todos os cadastros</option></select></label><label>Uso no Financeiro<select className="fx-select" value={scope} onChange={e=>setScope(e.target.value)}><option value="todos">Todos os clientes do BASE</option><option value="financeiro">Com lançamentos financeiros</option><option value="sem">Sem lançamentos financeiros</option></select></label></div>
+      <div className="fx-central-filters"><label>Situação no Financeiro<select className="fx-select" value={archiveFilter} onChange={e=>setArchiveFilter(e.target.value)}><option value="ativos">Não arquivados</option><option value="arquivados">Arquivados</option><option value="todos">Todos os cadastros</option></select></label><label>Uso no Financeiro<select className="fx-select" value={scope} onChange={e=>setScope(e.target.value)}><option value="todos">Todos os clientes do BASE</option><option value="financeiro">Com lançamentos financeiros</option><option value="sem">Sem lançamentos financeiros</option></select></label></div>
       {rows.length ? rows.map((c) => {
         const ltv = revenueStats(c, entries).revenue;
-        return <div className="fx-contact" key={c.id} onClick={() => onOpen(c)} style={{cursor:'pointer'}}><div className="fx-contact-ic">{initials(c.tradeName || c.name)}</div><div className="fx-contact-main"><p className="fx-contact-name">{c.tradeName || c.name}</p><p className="fx-contact-sub"><Icon name="briefcase" size={13}/>{c.segment} · desde {fmtSince(c.since)}</p></div><div className="fx-contact-right"><span className={'fx-badge ' + statusClass(c.status)}>{c.archivedAt ? 'Arquivado' : c.status}</span><div className="fx-contact-amt"><div className="lb">LTV</div><div className="vl fx-num">{ltv > 0 ? brl0(ltv) : '—'}</div></div><div className="fx-row-actions" onClick={(e)=>e.stopPropagation()}><button className="fx-icon sm" title="Visualizar" onClick={()=>onOpen(c)}><Icon name="search" size={15}/></button><button className="fx-icon sm" title="Editar" onClick={()=>onEdit(c)}><Icon name="pencil" size={16}/></button><button className="fx-icon sm danger" title={c.archivedAt ? 'Restaurar cadastro' : 'Arquivar cadastro'} onClick={()=>onDelete(c)}><Icon name="trash" size={16}/></button></div></div></div>;
+        return <div className="fx-contact" key={c.id} onClick={() => onOpen(c)} style={{cursor:'pointer'}}><div className="fx-contact-ic">{initials(c.tradeName || c.name)}</div><div className="fx-contact-main"><p className="fx-contact-name">{c.tradeName || c.name}</p><p className="fx-contact-sub"><Icon name="briefcase" size={13}/>{c.segment} · desde {fmtSince(c.since)}</p></div><div className="fx-contact-right"><span className={'fx-badge ' + statusClass(c.status)}>{c.appArchivedAt ? 'Arquivado no Financeiro' : c.status}</span><div className="fx-contact-amt"><div className="lb">LTV</div><div className="vl fx-num">{ltv > 0 ? brl0(ltv) : '—'}</div></div><div className="fx-row-actions" onClick={(e)=>e.stopPropagation()}><button className="fx-icon sm" title="Visualizar" onClick={()=>onOpen(c)}><Icon name="search" size={15}/></button><button className="fx-icon sm" title="Editar" onClick={()=>onEdit(c)}><Icon name="pencil" size={16}/></button><button className="fx-icon sm danger" title={c.appArchivedAt ? 'Restaurar / excluir da central' : 'Arquivar / excluir da central'} onClick={()=>onDelete(c)}><Icon name="trash" size={16}/></button></div></div></div>;
       }) : <div className="fx-empty"><div className="ic"><Icon name="users" size={26}/></div><p>Nenhum cliente encontrado.</p></div>}
     </div>
   );
@@ -169,7 +170,7 @@ function ClientDetail({ client, entries, onBack, onEdit, onDelete }) {
         <button className="fx-back" onClick={onBack}><Icon name="arrow-left" size={18} />Clientes</button>
         <div className="fx-detail-actions">
           <button className="fx-btn ghost sm" onClick={() => onEdit(c)}><Icon name="pencil" size={16} />Editar</button>
-          <button className="fx-btn danger-outline sm" onClick={() => onDelete(c)}><Icon name="users" size={16} />{c.archivedAt ? 'Restaurar cadastro' : 'Arquivar cadastro'}</button>
+          <button className="fx-btn danger-outline sm" onClick={() => onDelete(c)}><Icon name="users" size={16} />{c.appArchivedAt ? 'Restaurar / excluir da central' : 'Arquivar / excluir da central'}</button>
         </div>
       </div>
 
@@ -179,8 +180,8 @@ function ClientDetail({ client, entries, onBack, onEdit, onDelete }) {
           <div className="fx-profile-name">{c.name}</div>
           <div className="fx-profile-seg">{c.tradeName || c.name} · {c.segment}</div>
           <div className="fx-profile-tags">
-            <span className="fx-badge indigo">Cadastro central BASE</span>{c.archivedAt && <span className="fx-badge amber">Arquivado</span>}
-            <span className={'fx-badge ' + statusClass(c.status)}>{c.archivedAt ? 'Arquivado' : c.status}</span>
+            <span className="fx-badge indigo">Cadastro central BASE</span>{(c._appStates||[]).filter(a=>a.archived_at).map(a=><span className="fx-badge amber" key={a.app_id}>Arquivado no {a.app_id==='not'?'NOT':'Financeiro'}</span>)}{c.appArchivedAt && <span className="fx-badge amber">Arquivado</span>}
+            <span className={'fx-badge ' + statusClass(c.status)}>{c.appArchivedAt ? 'Arquivado no Financeiro' : c.status}</span>
             <span className="fx-badge"><Icon name="calendar" size={12} />Cliente desde {fmtSince(c.since)}</span>
           </div>
         </div>
@@ -331,28 +332,8 @@ function ClienteModal({ initial, onClose, onSave }) {
   );
 }
 
-function ConfirmDelete({ client, onClose, onConfirm }) {
-  return (
-    <div className="fx-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="fx-modal" style={{ width: 'min(420px,100%)' }}>
-        <div className="fx-modal-body" style={{ alignItems: 'center', textAlign: 'center', paddingTop: 30 }}>
-          <div className="fx-confirm-ic"><Icon name="trash" size={26} /></div>
-          <h2 style={{ margin: '4px 0 0', fontSize: 19, fontWeight: 800, letterSpacing: '-.03em' }}>{client.archivedAt ? 'Restaurar cadastro?' : 'Arquivar cadastro?'}</h2>
-          <p style={{ margin: '8px 0 0', color: 'var(--muted)', fontSize: 14, lineHeight: 1.5 }}>
-            <b>{client.name}</b> {client.archivedAt ? 'voltará a aparecer na seleção de clientes.' : 'sairá da seleção de novos serviços e lançamentos nos apps conectados à central.'} Contratos, lançamentos e históricos serão preservados. Isso não cancela serviços nem cobranças.
-          </p>
-        </div>
-        <div className="fx-modal-foot">
-          <button className="fx-modal-cancel" onClick={onClose}>Cancelar</button>
-          <button className="fx-modal-save" onClick={onConfirm}><Icon name="users" size={16} />{client.archivedAt ? 'Restaurar' : 'Arquivar'}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ---------- view orquestradora ----------
-export default function ClientesView({ clients, entries, query, onSave, onDelete, notify }) {
+export default function ClientesView({ clients, entries, query, onSave, workspaceId, canDelete, syncReady, onLifecycle, notify }) {
   const navigate = useNavigate();
   const location = useLocation();
   const routeId = location.pathname.split('/')[2];
@@ -362,25 +343,20 @@ export default function ClientesView({ clients, entries, query, onSave, onDelete
 
   const open = (c) => { navigate(`/clientes/${c.id}`); window.scrollTo?.(0, 0); };
   const save = (payload) => { if(onSave(payload)===false)return; setModal(null); notify(payload.id ? 'Salvando alterações na central…' : 'Salvando cliente na central…'); };
-  const confirmDel = () => {
-    onDelete(del.id);
-    if (selected?.id === del.id) navigate('/clientes');
-    notify(del.archivedAt ? 'Restaurando cadastro…' : 'Arquivando cadastro, sem apagar o histórico…');
-    setDel(null);
-  };
+
 
   if (selected) {
     return (
       <React.Fragment>
         <ClientDetail client={selected} entries={entries} onBack={() => navigate('/clientes')} onEdit={(c) => setModal({ ...c })} onDelete={(c) => setDel(c)} />
         {modal && <ClienteModal initial={modal} onClose={() => setModal(null)} onSave={save} />}
-        {del && <ConfirmDelete client={del} onClose={() => setDel(null)} onConfirm={confirmDel} />}
+        {del && <ConfirmDelete client={del} onClose={() => setDel(null)} workspaceId={workspaceId} canDelete={canDelete} enabled={syncReady} onApplied={async()=>{await onLifecycle();setDel(null);navigate('/clientes');notify('Central atualizada.');}} />}
       </React.Fragment>
     );
   }
 
   if (routeId === 'ranking') return <TopBuyers clients={clients} entries={entries} onOpen={open} full />;
-  if (routeId === 'todos') return <React.Fragment><ClientList clients={clients} entries={entries} query={query} onOpen={open} onEdit={(c)=>setModal({...c})} onDelete={(c)=>setDel(c)} onNew={()=>setModal({})} full />{modal && <ClienteModal initial={modal} onClose={()=>setModal(null)} onSave={save}/>} {del && <ConfirmDelete client={del} onClose={()=>setDel(null)} onConfirm={confirmDel}/>}</React.Fragment>;
+  if (routeId === 'todos') return <React.Fragment><ClientList clients={clients} entries={entries} query={query} onOpen={open} onEdit={(c)=>setModal({...c})} onDelete={(c)=>setDel(c)} onNew={()=>setModal({})} full />{modal && <ClienteModal initial={modal} onClose={()=>setModal(null)} onSave={save}/>} {del && <ConfirmDelete client={del} onClose={()=>setDel(null)} workspaceId={workspaceId} canDelete={canDelete} enabled={syncReady} onApplied={async()=>{await onLifecycle();setDel(null);navigate('/clientes');notify('Central atualizada.');}}/>}</React.Fragment>;
 
   return (
     <React.Fragment>
@@ -388,7 +364,7 @@ export default function ClientesView({ clients, entries, query, onSave, onDelete
       <ClientList clients={clients} entries={entries} query={query} onOpen={open} onEdit={(c) => setModal({ ...c })}
         onDelete={(c) => setDel(c)} onNew={() => setModal({})} onViewAll={()=>navigate('/clientes/todos')} />
       {modal && <ClienteModal initial={modal} onClose={() => setModal(null)} onSave={save} />}
-      {del && <ConfirmDelete client={del} onClose={() => setDel(null)} onConfirm={confirmDel} />}
+      {del && <ConfirmDelete client={del} onClose={() => setDel(null)} workspaceId={workspaceId} canDelete={canDelete} enabled={syncReady} onApplied={async()=>{await onLifecycle();setDel(null);navigate('/clientes');notify('Central atualizada.');}} />}
     </React.Fragment>
   );
 }

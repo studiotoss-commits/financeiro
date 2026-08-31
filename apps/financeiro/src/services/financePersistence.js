@@ -20,7 +20,7 @@ export function createFinancePersistence(client, workspaceId, revision, initialC
           result = await client.rpc('save_finance_state', {
           p_workspace_id: workspaceId,
           p_expected_revision: currentRevision,
-          p_state: { version: 2, entries: snapshot.entries, suppliers: snapshot.suppliers, clientChanges: changes,
+          p_state: { version: 3, entries: snapshot.entries, suppliers: snapshot.suppliers, clientChanges: changes,
             settings: { categories: snapshot.categories, taxRate: snapshot.taxRate, account: snapshot.account } },
           });
         } catch (error) {

@@ -26,11 +26,13 @@ export async function loadFinanceState(user) {
   const snapshot = result.data;
   const settings = snapshot.settings?.payload || {};
   const profiles = new Map(snapshot.profiles.map(p => [p.id, p]));
-  const clients = snapshot.clients.map(row => mergeClient(row, profiles.get(row.id)));
+  const archives=new Map((snapshot.clientApps||[]).filter(a=>a.app_id==='financeiro').map(a=>[a.client_id,a]));
+  const clients = snapshot.clients.map(row => ({...mergeClient(row, profiles.get(row.id), archives.get(row.id)),_appStates:(snapshot.clientApps||[]).filter(a=>a.client_id===row.id)}));
   const persistence = createFinancePersistence(supabase, workspaceId, Number(snapshot.settings?.revision) || 0, clients);
 
   return {
     workspaceId,
+    centralManager: Boolean(snapshot.centralManager),
     entries: snapshot.entries,
     clients,
     suppliers: snapshot.suppliers,

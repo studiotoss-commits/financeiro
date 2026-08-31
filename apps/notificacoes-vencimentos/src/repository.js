@@ -11,12 +11,17 @@ export async function listWorkspaces(userId){
 }
 export async function activate(workspaceId,name){return checked(await supabase.rpc('activate_not_workspace',{p_workspace_id:workspaceId||null,p_name:name||'BASE'}));}
 export async function loadNot(workspaceId){
-  const [clients,services]=await Promise.all([
+  const [clients,services,archives]=await Promise.all([
     supabase.from('base_clients').select('*').eq('workspace_id',workspaceId).order('name'),
     supabase.from('not_services').select('*').eq('workspace_id',workspaceId).order('due_date'),
+    supabase.from('base_client_app_state').select('*').eq('workspace_id',workspaceId).eq('app_id','not'),
   ]);
-  return {clients:checked(clients),services:checked(services)};
+  const appState=new Map(checked(archives).map(a=>[a.client_id,a]));
+  const mapped=checked(clients).map(c=>({...c,app_archived_at:appState.get(c.id)?.archived_at||c.archived_at||null,app_revision:Number(appState.get(c.id)?.revision||0)}));
+  const byId=new Map(mapped.map(c=>[c.id,c]));
+  return {clients:mapped,services:checked(services).map(s=>({...s,client_archived_at:byId.get(s.client_id)?.app_archived_at||null}))};
 }
+export async function archiveClient(workspaceId,client){return checked(await supabase.rpc('set_client_app_archived',{p_workspace_id:workspaceId,p_client_id:client.id,p_app_id:'not',p_archived:!client.app_archived_at,p_expected_revision:client.app_revision||0}));}
 export async function history(workspaceId,serviceId){return checked(await supabase.from('not_service_events').select('*').eq('workspace_id',workspaceId).eq('service_id',serviceId).order('created_at',{ascending:false}).limit(100));}
 export async function saveService(workspaceId,service){return checked(await supabase.rpc('save_not_service',{p_workspace_id:workspaceId,p_id:service.id,p_data:service,p_expected_revision:service.revision}));}
 export async function renew(workspaceId,service,paidOn,nextDue,amountCents){return checked(await supabase.rpc('renew_not_service',{p_workspace_id:workspaceId,p_id:service.id,p_expected_revision:service.revision,p_paid_on:paidOn,p_next_due:nextDue||null,p_amount_cents:amountCents}));}
