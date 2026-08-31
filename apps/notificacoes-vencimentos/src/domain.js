@@ -4,7 +4,9 @@ export const STATUSES={active:'Ativo',paused:'Pausado',canceled:'Cancelado',comp
 export const DEFAULT_TEMPLATE='Olá, {contato}!\n\nLembramos que {servico} ({identificador}) vence em {vencimento}.\nValor previsto: {valor}.\nPagamento para: {beneficiario}.\nFornecedor: {fornecedor}.\n\n{link_pagamento}\n{link_painel}\n\nSe já realizou o pagamento, por favor confirme com a TOSS para atualizarmos o controle.\n\nEquipe TOSS';
 export const todayISO=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const utcDay=s=>new Date(`${s}T12:00:00Z`);
-export const dateBR=s=>s?new Intl.DateTimeFormat('pt-BR',{timeZone:'UTC'}).format(utcDay(s)):'—';
+export const dateBR=s=>s?new Intl.DateTimeFormat('pt-BR',{timeZone:'UTC'}).format(utcDay(s)):'A confirmar';
+export const needsReview=service=>!service.due_date||service.recurrence_months==null||service.notes?.includes('[REVISAR]');
+export const compareServices=(a,b)=>(a.due_date||'9999').localeCompare(b.due_date||'9999')||a.name.localeCompare(b.name);
 export const money=cents=>cents===null||cents===undefined?'A confirmar':new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100);
 export const daysUntil=(date,today=todayISO())=>Math.round((utcDay(date)-utcDay(today))/86400000);
 export function addDays(date,days){const d=utcDay(date);d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);}
@@ -18,7 +20,7 @@ export function urgency(service,today=todayISO()){
   return {label:`Em ${days} dia${days===1?'':'s'}`,tone:days<=2?'danger':days<=15?'warning':days<=30?'accent':'success',group:days<=2?'urgent':days<=30?'upcoming':'later'};
 }
 export function reminders(service,today=todayISO()){
-  if(service.status!=='active')return [];
+  if(service.status!=='active'||!service.due_date||service.recurrence_months==null)return [];
   return service.reminder_days.map(days=>{const date=addDays(service.due_date,-days);return {days,date,label:date===today?'Previsto para hoje':date<today?'Data já passou · sem envio':'Prévia programada'};});
 }
 export function safeLink(value){try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:null;}catch{return null;}}

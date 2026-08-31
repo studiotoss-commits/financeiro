@@ -51,7 +51,9 @@ export function ServiceForm({workspace,service,clients,onClientSaved,onClose,onS
       const offsets=days.split(',').map(s=>Number(s.trim()));
       if(offsets.length<1||offsets.length>6||offsets.some(n=>!Number.isInteger(n)||n<1||n>90)||new Set(offsets).size!==offsets.length)throw new Error('Informe de 1 a 6 avisos diferentes, entre 1 e 90 dias, separados por vírgula.');
       for(const key of ['payment_url','panel_url','document_url'])if(form[key]&&!safeLink(form[key]))throw new Error('Use links HTTPS completos, sem usuário ou senha na URL.');
-      record={...form,amount_cents:parseMoney(amount),recurrence_months:Number(form.recurrence_months),reminder_days:offsets.sort((a,b)=>b-a)};
+      const cadence=form.recurrence_months==null||form.recurrence_months===''?null:Number(form.recurrence_months);
+      if(form.status!=='paused'&&(!form.due_date||cadence===null))throw new Error('Confirme o vencimento e a recorrência antes de retirar o serviço da situação Pausado.');
+      record={...form,due_date:form.due_date||null,amount_cents:parseMoney(amount),recurrence_months:cadence,reminder_days:offsets.sort((a,b)=>b-a)};
     }catch(e){setError(e.message);return;}
     setBusy(true);try{onSaved(await repo.saveService(workspace.id,record));}catch(e){setError(userError(e));}finally{setBusy(false);}
   }
@@ -64,8 +66,8 @@ export function ServiceForm({workspace,service,clients,onClientSaved,onClose,onS
       <Field label="Fornecedor"><input value={form.provider} onChange={change('provider')} maxLength={160} placeholder="Registro.br, Hostinger, TOSS…"/></Field>
       <Field label="Pagamento para"><input value={form.payee} onChange={change('payee')} maxLength={160} placeholder="TOSS ou nome da empresa responsável"/></Field>
       <Field label="Valor previsto (R$)" hint="Deixe vazio se ainda precisa confirmar."><input inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="149,90"/></Field>
-      <Field label="Próximo vencimento *"><input type="date" required min="2000-01-01" max="2200-12-31" value={form.due_date} onChange={change('due_date')} onInput={change('due_date')}/></Field>
-      <Field label="Recorrência"><select value={form.recurrence_months} onChange={change('recurrence_months')}>{Object.entries(CADENCES).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></Field>
+      <Field label="Próximo vencimento" hint="Pode ficar vazio enquanto o serviço estiver pausado."><input type="date" required={form.status!=='paused'} min="2000-01-01" max="2200-12-31" value={form.due_date||''} onChange={change('due_date')} onInput={change('due_date')}/></Field>
+      <Field label="Recorrência"><select required={form.status!=='paused'} value={form.recurrence_months??''} onChange={change('recurrence_months')}><option value="">A confirmar</option>{Object.entries(CADENCES).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></Field>
       <Field label="Situação do serviço"><select value={form.status} onChange={change('status')}>{Object.entries(STATUSES).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></Field>
       <Field label="Avisar quantos dias antes?" hint="Até 6 prazos, de 1 a 90 dias. Exemplo: 30, 15, 2."><input required value={days} onChange={e=>setDays(e.target.value)}/></Field>
       <Field label="Link de pagamento" wide><input type="url" value={form.payment_url} onChange={change('payment_url')} maxLength={2000} placeholder="https://…"/></Field>
@@ -75,7 +77,7 @@ export function ServiceForm({workspace,service,clients,onClientSaved,onClose,onS
       <Field label="Nome do contato"><input value={form.contact_name} onChange={change('contact_name')} maxLength={160}/></Field>
       <Field label="E-mail do contato"><input type="email" value={form.contact_email} onChange={change('contact_email')} maxLength={254}/></Field>
       <Field label="WhatsApp do contato"><input type="tel" value={form.contact_whatsapp} onChange={change('contact_whatsapp')} maxLength={40}/></Field>
-      <Field label="Observações internas" wide><textarea rows={3} value={form.notes} onChange={change('notes')} maxLength={4000}/></Field>
+      <Field label="Observações internas" wide hint="Após conferir os dados importados, remova o marcador [REVISAR] para concluir a revisão."><textarea rows={3} value={form.notes} onChange={change('notes')} maxLength={4000}/></Field>
       <details className="wide not-template"><summary>Personalizar mensagem</summary><p>Use {'{cliente}, {contato}, {servico}, {identificador}, {vencimento}, {valor}, {beneficiario}, {fornecedor}, {link_pagamento}, {link_painel}'}. Deixe vazio para usar o modelo TOSS.</p><textarea aria-label="Modelo personalizado" rows={8} maxLength={5000} value={form.message_template} placeholder={DEFAULT_TEMPLATE} onChange={change('message_template')}/></details>
       <div className="wide"><ErrorBox error={error} draft={{...form,amount,days}}/></div>
     </div><footer><span className="not-foot-note">Nenhuma mensagem será enviada.</span><button type="button" className="not-button secondary" onClick={close} disabled={busy}>Cancelar</button><button className="not-button" disabled={busy}>{busy?'Salvando…':'Salvar serviço'}</button></footer>

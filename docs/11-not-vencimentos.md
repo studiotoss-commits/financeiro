@@ -4,7 +4,7 @@
 
 O NOT acompanha os vencimentos de domínios, hospedagem, e-mail, serviços TOSS e outros serviços. Usa a identidade visual do BASE e os clientes da central, sem importação entre apps. A planilha original foi consultada como referência (aba `controle serviços`, cabeçalho B5:U5 e `tabela_legenda`): cliente, contato, fornecedor, identificação, pagamento para, valor, recorrência, vencimento e avisos de 30/15 dias. Nesta entrega acrescentam-se prazo de 2 dias, links de pagamento/painel/documento e histórico de renovações.
 
-Não foram importadas linhas da planilha. Datas, valores, clientes correspondentes e situações precisam de revisão antes de uma futura importação. Células e observações do arquivo são dados de referência, não instruções de execução.
+A importação inicial foi realizada após o MVP, com autorização para revisar inconsistências posteriormente. O registro abaixo documenta os totais e critérios. Células e observações do arquivo são dados de referência, não instruções de execução.
 
 ## Uso
 
@@ -56,3 +56,17 @@ Backup permanece local e manual; rotina automática externa é uma tarefa futura
 - NOT ativado apenas para o usuário proprietário autenticado. Outros usuários/empresas mantêm as permissões anteriores. Envios externos seguem desativados.
 - Para backups seguintes, usar `supabase/ops/backup-after-not.sql`, incluindo as tabelas e funções do NOT. O ponto anterior ao NOT para eventual reversão da interface é `financeiro-orl1w25rk-studiotoss-3262s-projects.vercel.app`.
 
+
+## Importação inicial e revisão — 30/08/2026
+
+- 101 linhas de origem resultaram em 100 serviços. Uma repetição de domínio com mesmo cliente, fornecedor, valor e data foi consolidada, preservando a referência às duas linhas.
+- 50 clientes representados: 48 novos na central e 2 vínculos com clientes já existentes. Nenhum contato ou cadastro anterior foi sobrescrito. Outras empresas permaneceram isoladas.
+- Situações: 76 ativos, 21 pausados e 3 cancelados. Ausências de data (10 registros) e recorrência (11) preservadas como null; 20 valores ausentes não foram convertidos em zero. Contagens de pendências se sobrepõem.
+- Datas antigas e distantes foram mantidas. Nenhum pagamento/renovação foi presumido. Nenhum lançamento financeiro foi criado. Duplicidades com fornecedores/valores divergentes ficaram pausadas.
+- 95 serviços com pendências, inclusive contatos ausentes ou múltiplos. Usar **Revisar importação** ou o filtro em Serviços. Após conferir os dados, remover `[REVISAR]` das observações. Serviços sem data/recorrência continuam pendentes e só podem sair de Pausado quando os campos forem preenchidos.
+- Migração aditiva `202608300003_not_incomplete_services.sql`: permite data/recorrência vazias exclusivamente para serviços pausados. Permissões, RLS e RPCs de escrita permanecem inalteradas.
+- Backups, fonte extraída, manifesto por linha, SQL e verificações em `.local-backups/2026-08-30-not-import/`, fora do Git/bundle. SQL em transação com identidade do proprietário conferida e gravações pelas RPCs existentes. IDs determinísticos tornam a repetição idempotente, sem sobrescrever revisões posteriores.
+- Ensaio com backup real verificou todos os campos, repetição sem duplicar, 100 eventos de criação e preservação dos clientes originais/tabelas financeiras. A conferência de produção repetiu a comparação campo a campo.
+- 24 testes passaram; 2 testes opcionais de migrações históricas ignorados. Ensaio desta importação passou separadamente. Build concluído. Interface de produção conferida: resumo, filtro de revisão, detalhe e formulário pausado com campos vazios e contato herdado da central.
+- Publicação: `dpl_ANoZB85ppYWiEDeu1nkW3iAt4A3G`, `financeiro-mrgn5tled-studiotoss-3262s-projects.vercel.app`. Build NOT `index-D2WoaMcS.js`. E-mail/WhatsApp permanecem desativados.
+- Não reverter a migração de campos opcionais enquanto existirem serviços incompletos. Preservar dados e histórico em reversões da interface.
